@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fridge-to-Feast AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --color-primary: #5A6E55; /* Sage Green */
+        --color-primary-light: #849B80;
+        --color-accent: #E58A4E; /* Burnt Orange */
+        --color-accent-dark: #D47535;
+        --color-text-primary: #2d2d2d;
+        --color-text-secondary: #575757;
+        --color-bg: #FBF9F6; /* Linen */
+        --color-surface: #FFFFFF;
+        --color-border: #EAE5E0;
+      }
+      body {
+        font-family: 'Poppins', sans-serif;
+        background-color: var(--color-bg);
+        color: var(--color-text-primary);
+      }
+      /* Custom scrollbar for a more polished look */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--color-bg);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--color-primary-light);
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--color-primary);
+      }
+      .primary-button {
+        @apply w-full bg-[--color-accent] text-white font-bold py-3 px-6 rounded-lg hover:bg-[--color-accent-dark] transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[--color-accent] disabled:bg-opacity-50 disabled:cursor-not-allowed;
+      }
+      .secondary-button {
+        @apply w-full bg-transparent text-[--color-accent] font-bold py-3 px-6 rounded-lg hover:bg-[--color-accent]/10 transition-colors duration-300 border-2 border-[--color-accent] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[--color-accent];
+      }
+       .tertiary-button {
+        @apply w-full bg-[--color-border] text-[--color-text-secondary] font-bold py-3 px-6 rounded-lg hover:bg-opacity-70 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.26.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

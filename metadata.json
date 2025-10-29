@@ -1,0 +1,5 @@
+{
+  "name": "Fridge-to-Feast AI",
+  "description": "Snap a photo of your fridge's contents, and our AI will analyze the ingredients, generate a custom recipe with a beautiful image of the final dish, and provide web sources for inspiration.",
+  "requestFramePermissions": []
+}
