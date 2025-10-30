@@ -9,20 +9,48 @@ interface IngredientEditorProps {
     onConfirm: (ingredients: AvailableIngredient[]) => void;
     onCancel: () => void;
     t: TFunction;
+    maxIngredients: number;
 }
 
-const unitOptions = [
-    { label: 'Volume', options: ['ml', 'cl', 'dl', 'l'] },
-    { label: 'Weight', options: ['g', 'hg', 'kg'] },
-    { label: 'Other', options: ['unit', 'piece', 'pinch', 'can', 'bottle'] },
-];
-
-const allStandardUnits = unitOptions.flatMap(group => group.options);
-
-export const IngredientEditor: React.FC<IngredientEditorProps> = ({ initialIngredients, onConfirm, onCancel, t }) => {
+export const IngredientEditor: React.FC<IngredientEditorProps> = ({ initialIngredients, onConfirm, onCancel, t, maxIngredients }) => {
     const [ingredients, setIngredients] = useState<AvailableIngredient[]>(initialIngredients);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const endOfListRef = useRef<HTMLDivElement>(null);
+    
+    const unitOptions = [
+        { 
+            label: t('unitGroupVolume'), 
+            options: [
+                { value: 'ml', label: 'ml' },
+                { value: 'cl', label: 'cl' },
+                { value: 'dl', label: 'dl' },
+                { value: 'l', label: 'l' },
+            ] 
+        },
+        { 
+            label: t('unitGroupWeight'), 
+            options: [
+                { value: 'g', label: 'g' },
+                { value: 'hg', label: 'hg' },
+                { value: 'kg', label: 'kg' },
+            ] 
+        },
+        { 
+            label: t('unitGroupOther'), 
+            options: [
+                { value: 'bottle', label: t('unit_bottle') },
+                { value: 'can', label: t('unit_can') },
+                { value: 'container', label: t('unit_container') },
+                { value: 'jar', label: t('unit_jar') },
+                { value: 'package', label: t('unit_package') },
+                { value: 'piece', label: t('unit_piece') },
+                { value: 'pinch', label: t('unit_pinch') },
+                { value: 'unit', label: t('unit_unit') },
+            ] 
+        },
+    ];
+    
+    const allStandardUnits = unitOptions.flatMap(group => group.options.map(opt => opt.value));
 
     const handleIngredientChange = (index: number, field: keyof AvailableIngredient, value: string | number) => {
         const newIngredients = [...ingredients];
@@ -49,7 +77,9 @@ export const IngredientEditor: React.FC<IngredientEditorProps> = ({ initialIngre
     }
 
     const handleAddIngredient = () => {
-        setIngredients([...ingredients, { name: '', quantity: 1, unit: 'g' }]);
+        if (ingredients.length < maxIngredients) {
+            setIngredients([...ingredients, { name: '', quantity: 1, unit: 'g' }]);
+        }
     };
 
     const handleRemoveIngredient = (index: number) => {
@@ -67,6 +97,7 @@ export const IngredientEditor: React.FC<IngredientEditorProps> = ({ initialIngre
     }, [ingredients.length]);
     
     const hasIngredients = ingredients.filter(ing => ing.name.trim() !== '' && ing.quantity > 0).length > 0;
+    const atMaxIngredients = ingredients.length >= maxIngredients;
 
     return (
         <div className="w-full max-w-2xl text-center p-8 bg-[--color-surface] rounded-2xl shadow-xl border border-[--color-border]">
@@ -109,7 +140,7 @@ export const IngredientEditor: React.FC<IngredientEditorProps> = ({ initialIngre
                                 {unitOptions.map(group => (
                                     <optgroup key={group.label} label={group.label}>
                                         {group.options.map(option => (
-                                            <option key={option} value={option}>{option}</option>
+                                            <option key={option.value} value={option.value}>{option.label}</option>
                                         ))}
                                     </optgroup>
                                 ))}
@@ -127,9 +158,14 @@ export const IngredientEditor: React.FC<IngredientEditorProps> = ({ initialIngre
                 <div ref={endOfListRef} />
             </div>
 
+            {atMaxIngredients && (
+                <p className="text-sm text-[--color-text-secondary] mt-4 font-semibold">{t('ingredientLimitReached', { count: maxIngredients })}</p>
+            )}
+
             <button
                 onClick={handleAddIngredient}
-                className="mt-4 flex items-center justify-center gap-2 w-full text-[--color-primary] font-semibold py-2 px-4 rounded-lg hover:bg-[--color-primary]/10 transition-colors duration-300 border-2 border-dashed border-[--color-border] hover:border-[--color-primary-light]"
+                disabled={atMaxIngredients}
+                className="mt-4 flex items-center justify-center gap-2 w-full text-[--color-primary] font-semibold py-2 px-4 rounded-lg hover:bg-[--color-primary]/10 transition-colors duration-300 border-2 border-dashed border-[--color-border] hover:border-[--color-primary-light] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
             >
                 <PlusIcon className="w-5 h-5" />
                 {t('addAnotherItem')}

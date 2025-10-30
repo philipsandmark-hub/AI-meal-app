@@ -7,7 +7,7 @@ export interface AvailableIngredient {
 }
 
 export interface Ingredient {
-  name: string;
+  name:string;
   quantity: number;
   unit: string;
 }
@@ -17,6 +17,7 @@ export interface Recipe {
   description: string;
   ingredients: Ingredient[];
   instructions: string[];
+  calories?: number;
   imageUrl?: string;
 }
 
@@ -24,4 +25,9 @@ export interface ShoppingListItem {
   name: string;
   amountToBuy: number;
   unit: string;
+}
+
+export interface MealType {
+  hot: boolean;
+  cold: boolean;
 }

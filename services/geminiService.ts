@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import type { AvailableIngredient, Recipe } from '../types';
+import type { AvailableIngredient, MealType, Recipe } from '../types';
 
 if (!process.env.API_KEY) {
   throw new Error("API_KEY environment variable is not set");
@@ -51,23 +51,73 @@ export const analyzeFridgeContents = async (imageFiles: File[]): Promise<Availab
   }
 };
 
-export const generateMultipleRecipes = async (ingredients: AvailableIngredient[], language: string): Promise<Recipe[]> => {
-  const ingredientsString = JSON.stringify(ingredients);
-  const prompt = `You are an expert chef AI for an app called "Fridge-to-Feast". Your primary and most critical function is to create delicious recipes using ONLY the ingredients a user already has. The entire purpose of the app is to avoid a trip to the grocery store.
+const STABLE_RECIPE_CORE_PROMPT = `You are an expert chef AI for an app called "Fridge-to-Feast". The app's entire purpose is to prevent a trip to the grocery store by creating recipes **using only ingredients the user already has.**
 
-Here is the list of available ingredients and their quantities: ${ingredientsString}.
+**ABSOLUTE CRITICAL RULES (Alphabetical Order):**
+- **CALORIE ESTIMATION:** For each recipe, provide a reasonable estimate of the total calories for a single serving. Include this as a number in the 'calories' field.
+- **EMPTY ARRAY FOR NO RECIPES:** If you cannot create any meaningful recipes that strictly follow all other rules, you **MUST** return an empty JSON array: \`[]\`. This is a valid and expected response.
+- **LIMITED PANTRY STAPLES:** You may assume the user has basic pantry items like salt, pepper, and vegetable oil. You can use these sparingly. Do NOT list any other items as assumed pantry staples (e.g., no mustard, no vinegar, no flour, unless they are in the provided list).
+- **NO EXTERNAL INGREDIENTS:** Do **NOT** invent, add, or assume any ingredients that are not on the list. For example, if the user has eggs but not milk, you cannot suggest a recipe that requires milk.
+- **RECIPE COUNT:** Generate exactly 2 diverse recipes.
+- **RESPECT QUANTITIES:** The quantity of each ingredient required for a single serving in your recipe must be less than or equal to the quantity available.
+- **USE ONLY AVAILABLE INGREDIENTS:** Every single ingredient in each recipe, without exception, **must** be from the list of available ingredients provided.
 
-**ABSOLUTE CRITICAL RULE:** You must generate up to 4 diverse recipes. Every single ingredient in each recipe **must** be from the list provided above. The ONLY exception is that you may assume the user has common pantry staples like salt, pepper, and oil, but do not list more than 2-3 of these. If you cannot create any meaningful recipes from the given ingredients, you MUST return an empty JSON array: []. **DO NOT, under any circumstances, invent or add ingredients that are not on the list.** For example, if the user has eggs but not milk, you cannot suggest a recipe that requires milk.
-
-For each recipe, provide the following details in ${language}:
+**OUTPUT FORMAT:**
+Return the response as a valid JSON array of recipe objects. For each recipe, provide the following details:
 - A catchy name ('recipeName').
 - A short description ('description').
-- A list of ingredients with the exact quantities and units for a single serving ('ingredients'). Make sure the quantities are reasonable for a single serving.
-- Detailed, step-by-step instructions for a beginner cook ('instructions').
+- An estimated calorie count per serving ('calories').
+- A list of ingredients with the exact quantities and units for a single serving ('ingredients').
+- Detailed, step-by-step instructions for a beginner cook ('instructions').`;
 
-Ensure all text fields in the final JSON response ('recipeName', 'description', ingredient 'name's, ingredient 'unit's, and 'instructions') are fully translated into ${language}.
+const creativityMap: { [key: number]: string } = {
+  1: "Generate simple, traditional, and very easy-to-make recipes. Prioritize classic combinations and straightforward techniques.",
+  2: "Generate recipes that are mostly traditional but might include one slightly interesting twist or combination. Keep it familiar.",
+  3: "Generate recipes that balance traditional cooking with creative ideas. They should be approachable but not boring.",
+  4: "Generate creative and interesting recipes. Use ingredients in less common ways and suggest more unique flavor combinations.",
+  5: "Generate highly creative, unconventional, and 'out-of-the-box' recipes. Be adventurous and suggest something the user has likely never tried before."
+};
 
-Return the response as a valid JSON array of recipe objects. If no recipes can be made, return an empty array [].`;
+export const generateMultipleRecipes = async (
+  ingredients: AvailableIngredient[], 
+  language: string,
+  creativity: number,
+  existingRecipes: Recipe[] = [],
+  mealType: MealType
+): Promise<Recipe[]> => {
+  const ingredientsString = JSON.stringify(ingredients);
+
+  // 1. Stable Core (defined above)
+  
+  // 2. Creativity Instruction
+  const creativityInstruction = `\n\n**CREATIVITY LEVEL:**\n${creativityMap[creativity] || creativityMap[3]}`;
+
+  // 3. Meal Temperature Instruction
+  let mealTypeInstruction = '\n\n**MEAL TEMPERATURE:**\n';
+  if (mealType.hot && mealType.cold) {
+    mealTypeInstruction += 'Generate a mix of hot and cold meals.';
+  } else if (mealType.hot) {
+    mealTypeInstruction += 'Generate only hot meals (dishes that are cooked and served warm).';
+  } else if (mealType.cold) {
+    mealTypeInstruction += 'Generate only cold meals (dishes that require no cooking, like salads or cold soups, and are served cold).';
+  } else {
+    mealTypeInstruction += 'Generate any type of meal.'; // Fallback
+  }
+
+  // 4. Tiny Locale Note
+  const tinyLocaleNote = `\n\n**RESPONSE LANGUAGE:**\nYour entire response, including all text fields ('recipeName', 'description', ingredient 'name's, 'unit's, and 'instructions'), must be fully translated into ${language}.`;
+  
+  // 5. Avoid Existing Recipes (if any)
+  let avoidRecipesNote = '';
+  if (existingRecipes.length > 0) {
+    const existingRecipeNames = existingRecipes.map(r => r.recipeName).join(', ');
+    avoidRecipesNote = `\n\n**IMPORTANT - AVOID DUPLICATES:**\nGenerate recipes that are distinctly different from the following already suggested recipes: [${existingRecipeNames}].`;
+  }
+
+  // 6. Per-request Content
+  const perRequestContent = `\n\n**AVAILABLE INGREDIENTS (JSON):**\n${ingredientsString}`;
+
+  const prompt = STABLE_RECIPE_CORE_PROMPT + creativityInstruction + mealTypeInstruction + tinyLocaleNote + avoidRecipesNote + perRequestContent;
   
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-pro',
@@ -81,6 +131,7 @@ Return the response as a valid JSON array of recipe objects. If no recipes can b
           properties: {
             recipeName: { type: Type.STRING },
             description: { type: Type.STRING },
+            calories: { type: Type.NUMBER },
             ingredients: {
               type: Type.ARRAY,
               items: {
@@ -98,7 +149,7 @@ Return the response as a valid JSON array of recipe objects. If no recipes can b
               items: { type: Type.STRING }
             },
           },
-          required: ['recipeName', 'description', 'ingredients', 'instructions'],
+          required: ['recipeName', 'description', 'ingredients', 'instructions', 'calories'],
         }
       },
     },
@@ -177,53 +228,5 @@ export const translateIngredientList = async (ingredients: AvailableIngredient[]
     console.error(`Failed to translate ingredient list to ${targetLanguage}:`, e);
     // Fallback: return original ingredients if translation fails
     return ingredients;
-  }
-};
-
-export const translateUI = async (targetLanguage: string, englishStrings: Record<string, string>): Promise<Record<string, string>> => {
-  const englishJsonString = JSON.stringify(englishStrings);
-  const prompt = `Translate the string values in the following JSON object to the language "${targetLanguage}". Return only a single, valid JSON object with the exact same keys as the input. Do not add any extra text, explanations, or markdown formatting. The response MUST be only the JSON object. JSON to translate: ${englishJsonString}`;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-      },
-    });
-
-    const rawText = response.text.trim();
-    let jsonString = rawText;
-
-    // The model sometimes wraps the JSON in markdown. Extract it.
-    const markdownMatch = rawText.match(/```(?:json)?\n([\s\S]*?)\n```/);
-    if (markdownMatch && markdownMatch[1]) {
-      jsonString = markdownMatch[1].trim();
-    }
-
-    // The model might still add extraneous text before or after the JSON object.
-    // Find the first '{' and the last '}' to isolate the JSON.
-    const firstBrace = jsonString.indexOf('{');
-    const lastBrace = jsonString.lastIndexOf('}');
-
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
-      jsonString = jsonString.substring(firstBrace, lastBrace + 1);
-      try {
-        // Attempt to parse the cleaned-up string
-        return JSON.parse(jsonString);
-      } catch (e) {
-        console.error("Failed to parse the extracted JSON string:", jsonString, e);
-        // Fall through to the generic error if parsing the extracted string fails.
-      }
-    }
-    
-    // If we couldn't find/parse a valid JSON object, throw an error.
-    console.error("Could not find a valid JSON object in the response:", rawText);
-    throw new Error("Response was not in the expected JSON format.");
-
-  } catch (error) {
-    console.error(`Failed to translate UI to ${targetLanguage}:`, error);
-    throw new Error(`Could not translate the app to ${targetLanguage}.`);
   }
 };
